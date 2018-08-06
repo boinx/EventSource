@@ -199,7 +199,7 @@ open class EventSource: NSObject, URLSessionDataDelegate {
                 theError = NSError(
                     domain: "com.inaka.eventSource.error",
                     code: -1,
-                    userInfo: ["message": "HTTP Status Code: \(urlResponse.statusCode)"]
+                    userInfo: ["message": "HTTP Status Code: \(urlResponse.statusCode)", "receivedData": self.receivedDataBuffer.copy()]
                 )
                 self.close()
             }
