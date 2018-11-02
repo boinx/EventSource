@@ -21,12 +21,12 @@ open class EventSource: NSObject, URLSessionDataDelegate {
 	fileprivate let lastEventIDKey: String
     fileprivate let receivedString: NSString?
     fileprivate var onOpenCallback: (() -> Void)?
-    fileprivate var onErrorCallback: ((NSError?) -> Void)?
+    fileprivate var onErrorCallback: ((NSError?, Bool) -> Void)?
     fileprivate var onMessageCallback: ((_ id: String?, _ event: String?, _ data: String?) -> Void)?
     fileprivate var eventListeners = Dictionary<String, (_ id: String?, _ event: String?, _ data: String?) -> Void>()
     fileprivate var headers: Dictionary<String, String>
     fileprivate var operationQueue: OperationQueue
-    fileprivate var errorBeforeSetErrorCallBack: NSError?
+    fileprivate var errorBeforeSetErrorCallBack: (NSError, Bool)?
     fileprivate let uniqueIdentifier: String
     fileprivate let validNewlineCharacters = ["\r\n", "\n", "\r"]
 
@@ -119,11 +119,11 @@ open class EventSource: NSObject, URLSessionDataDelegate {
         self.onOpenCallback = onOpenCallback
     }
 
-    open func onError(_ onErrorCallback: @escaping ((NSError?) -> Void)) {
+    open func onError(_ onErrorCallback: @escaping ((NSError?, Bool) -> Void)) {
         self.onErrorCallback = onErrorCallback
 
-        if let errorBeforeSet = self.errorBeforeSetErrorCallBack {
-            self.onErrorCallback!(errorBeforeSet)
+        if let (errorBeforeSet, willReconnect) = self.errorBeforeSetErrorCallBack {
+            onErrorCallback(errorBeforeSet, willReconnect)
             self.errorBeforeSetErrorCallBack = nil
         }
     }
@@ -177,6 +177,8 @@ open class EventSource: NSObject, URLSessionDataDelegate {
 
     open func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
         self.readyState = EventSourceState.closed
+        
+        var willReconnect = false
 
 		if self.receivedMessageToClose(task.response as? HTTPURLResponse) {
             return
@@ -187,6 +189,7 @@ open class EventSource: NSObject, URLSessionDataDelegate {
         }
 
         if !hasHttpError(code: urlResponse.statusCode) && (error == nil || (error! as NSError).code != -999) {
+            willReconnect = true
             DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(retryTime)) {
                 self.connect()
             }
@@ -199,15 +202,18 @@ open class EventSource: NSObject, URLSessionDataDelegate {
                 theError = NSError(
                     domain: "com.inaka.eventSource.error",
                     code: -1,
-                    userInfo: ["message": "HTTP Status Code: \(urlResponse.statusCode)", "receivedData": self.receivedDataBuffer.copy()]
+                    userInfo: [
+                        "message": "HTTP Status Code: \(urlResponse.statusCode)",
+                        "receivedData": self.receivedDataBuffer.copy()
+                    ]
                 )
                 self.close()
             }
 
             if let errorCallback = self.onErrorCallback {
-                errorCallback(theError)
-            } else {
-                self.errorBeforeSetErrorCallBack = theError
+                errorCallback(theError, willReconnect)
+            } else if let error = theError {
+                self.errorBeforeSetErrorCallBack = (error, willReconnect)
             }
         }
     }
