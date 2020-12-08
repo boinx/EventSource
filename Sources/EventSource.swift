@@ -36,17 +36,23 @@ open class EventSource: NSObject, URLSessionDataDelegate {
     internal var urlSession: Foundation.URLSession?
     internal var task: URLSessionDataTask?
     internal let receivedDataBuffer: NSMutableData
+    // TODO: REFACTOR: Use URLSession.shared instead of making a new instance of URLSession.
+    // TODO: LEARN: This dataTask will be called multiple times from many places. It is currently unknown what this would mean for concurrency. Research it!
 
     var event = Dictionary<String, String>()
-
+    
+    // MARK: - Init
+    
     public init(url: String, headers: [String : String] = [:]) {
+        // TODO: REFACTOR: Dont force unwrap even if it is safe.
         self.url = URL(string: url)!
+        // TODO: REFACTOR: URL could be private.
         self.headers = headers
         self.readyState = EventSourceState.closed
         self.operationQueue = OperationQueue()
         self.receivedString = nil
         self.receivedDataBuffer = NSMutableData()
-
+        // TODO: REFACTOR: Allow port to be default init value.
         let port = String(self.url.port ?? 80)
 		let relativePath = self.url.relativePath
 		let host = self.url.host ?? ""
@@ -54,12 +60,12 @@ open class EventSource: NSObject, URLSessionDataDelegate {
 
 		self.uniqueIdentifier = "\(scheme).\(host).\(port).\(relativePath)"
 		self.lastEventIDKey = "\(EventSource.DefaultsKey).\(self.uniqueIdentifier)"
-
+        
         super.init()
         self.connect()
     }
 
-//Mark: Connect
+    // MARK: - Connect
 
     func connect() {
         var additionalHeaders = self.headers
@@ -74,11 +80,11 @@ open class EventSource: NSObject, URLSessionDataDelegate {
         configuration.timeoutIntervalForRequest = TimeInterval(INT_MAX)
         configuration.timeoutIntervalForResource = TimeInterval(INT_MAX)
         configuration.httpAdditionalHeaders = additionalHeaders
-
+  
         self.readyState = EventSourceState.connecting
         self.urlSession = newSession(configuration)
         self.task = urlSession!.dataTask(with: self.url)
-
+    
 		self.resumeSession()
     }
 
@@ -94,7 +100,7 @@ open class EventSource: NSObject, URLSessionDataDelegate {
         )
     }
 
-//Mark: Close
+    // MARK: - Close
 
     open func close() {
         self.readyState = EventSourceState.closed
@@ -102,9 +108,8 @@ open class EventSource: NSObject, URLSessionDataDelegate {
     }
 
 	fileprivate func receivedMessageToClose(_ httpResponse: HTTPURLResponse?) -> Bool {
-		guard let response = httpResponse else {
-			return false
-		}
+		
+        guard let response = httpResponse else { return false }
 
 		if response.statusCode == 204 {
 			self.close()
@@ -113,7 +118,7 @@ open class EventSource: NSObject, URLSessionDataDelegate {
 		return false
 	}
 
-//Mark: EventListeners
+    // MARK: - EventListeners
 
     open func onOpen(_ onOpenCallback: @escaping (() -> Void)) {
         self.onOpenCallback = onOpenCallback
@@ -121,7 +126,7 @@ open class EventSource: NSObject, URLSessionDataDelegate {
 
     open func onError(_ onErrorCallback: @escaping ((NSError?, Bool) -> Void)) {
         self.onErrorCallback = onErrorCallback
-
+        // TODO: REFACTOR: Remove errorBeforeSetErrorCallBack.
         if let (errorBeforeSet, willReconnect) = self.errorBeforeSetErrorCallBack {
             onErrorCallback(errorBeforeSet, willReconnect)
             self.errorBeforeSetErrorCallBack = nil
@@ -144,16 +149,13 @@ open class EventSource: NSObject, URLSessionDataDelegate {
 		return Array(self.eventListeners.keys)
 	}
 
-//MARK: URLSessionDataDelegate
+//  MARK: - URLSessionDataDelegate
 
     open func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
-		if self.receivedMessageToClose(dataTask.response as? HTTPURLResponse) {
-			return
-		}
-
-		if self.readyState != EventSourceState.open {
-            return
-        }
+        
+        // TODO: REFACTOR: Ref method and use guard.
+		if self.receivedMessageToClose(dataTask.response as? HTTPURLResponse) { return }
+		if self.readyState != EventSourceState.open { return }
 
         self.receivedDataBuffer.append(data)
         let eventStream = extractEventsFromBuffer()
@@ -163,11 +165,11 @@ open class EventSource: NSObject, URLSessionDataDelegate {
     open func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
         completionHandler(URLSession.ResponseDisposition.allow)
 
-		if self.receivedMessageToClose(dataTask.response as? HTTPURLResponse) {
-			return
-		}
+        // TODO: REFACTOR: Ref method and use guard.
+        if self.receivedMessageToClose(dataTask.response as? HTTPURLResponse) { return }
 
         self.readyState = EventSourceState.open
+        
         if self.onOpenCallback != nil {
             DispatchQueue.main.async {
                 self.onOpenCallback!()
@@ -180,21 +182,19 @@ open class EventSource: NSObject, URLSessionDataDelegate {
         
         var willReconnect = false
 
-		if self.receivedMessageToClose(task.response as? HTTPURLResponse) {
-            return
-        }
+        // TODO: REFACTOR: Ref method and use guard.
+		if self.receivedMessageToClose(task.response as? HTTPURLResponse) { return }
 
-        guard let urlResponse = task.response as? HTTPURLResponse else {
-            return
-        }
-
+        guard let urlResponse = task.response as? HTTPURLResponse else { return }
+        
+        // TODO: REFACTOR: Create seperate bools and drop force unwraps.
         if !hasHttpError(code: urlResponse.statusCode) && (error == nil || (error! as NSError).code != -999) {
             willReconnect = true
             DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(retryTime)) {
                 self.connect()
             }
         }
-
+        
         DispatchQueue.main.async {
             var theError: NSError? = error as NSError?
 
@@ -213,12 +213,13 @@ open class EventSource: NSObject, URLSessionDataDelegate {
             if let errorCallback = self.onErrorCallback {
                 errorCallback(theError, willReconnect)
             } else if let error = theError {
+                // TODO: REFACTOR: Remove and dont use this errorBeforeSetErrorCallBack concept.
                 self.errorBeforeSetErrorCallBack = (error, willReconnect)
             }
         }
     }
 
-//MARK: Helpers
+    //  MARK: - Helpers
 
     fileprivate func extractEventsFromBuffer() -> [String] {
         var events = [String]()
