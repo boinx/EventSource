@@ -62,12 +62,11 @@ open class EventSource: NSObject, URLSessionDataDelegate {
 		self.lastEventIDKey = "\(EventSource.DefaultsKey).\(self.uniqueIdentifier)"
         
         super.init()
-        self.connect()
     }
 
     // MARK: - Connect
 
-    func connect() {
+    public func connect() {
         var additionalHeaders = self.headers
         if let eventID = self.lastEventID {
             additionalHeaders["Last-Event-Id"] = eventID
