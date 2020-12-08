@@ -172,7 +172,7 @@ open class EventSource: NSObject, URLSessionDataDelegate {
         
         if self.onOpenCallback != nil {
             DispatchQueue.main.async {
-                self.onOpenCallback!()
+                self.onOpenCallback?()
             }
         }
     }
@@ -332,8 +332,8 @@ open class EventSource: NSObject, URLSessionDataDelegate {
                 guard let key = k else { return }
 
                 if let value = value {
-                    if event[key] != nil {
-                        event[key] = "\(event[key]!)\n\(value)"
+                    if let eventValue = event[key] {
+                        event[key] = "\(eventValue)\n\(value)"
                     } else {
                         event[key] = value
                     }
