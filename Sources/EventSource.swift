@@ -383,7 +383,7 @@ open class EventSource: NSObject, URLSessionDataDelegate {
 
     class open func basicAuth(_ username: String, password: String) -> String {
         let authString = "\(username):\(password)"
-        let authData = authString.data(using: String.Encoding.utf8)
+        let authData = authString.data(using: .utf8)
         let base64String = authData!.base64EncodedString(options: [])
 
         return "Basic \(base64String)"
