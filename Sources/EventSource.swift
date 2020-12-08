@@ -33,11 +33,11 @@ open class EventSource: NSObject, URLSessionDataDelegate {
     open internal(set) var readyState: EventSourceState
     open fileprivate(set) var retryTime = 3000
 
-    internal var urlSession: Foundation.URLSession?
-    internal var task: URLSessionDataTask?
-    internal let receivedDataBuffer: NSMutableData
     // TODO: REFACTOR: Use URLSession.shared instead of making a new instance of URLSession.
     // TODO: LEARN: This dataTask will be called multiple times from many places. It is currently unknown what this would mean for concurrency. Research it!
+    var urlSession: Foundation.URLSession?
+    var task: URLSessionDataTask?
+    let receivedDataBuffer: NSMutableData
 
     var event = Dictionary<String, String>()
     
@@ -88,11 +88,11 @@ open class EventSource: NSObject, URLSessionDataDelegate {
 		self.resumeSession()
     }
 
-	internal func resumeSession() {
-		self.task!.resume()
+    func resumeSession() {
+		self.task?.resume()
 	}
 
-    internal func newSession(_ configuration: URLSessionConfiguration) -> URLSession {
+    func newSession(_ configuration: URLSessionConfiguration) -> URLSession {
         return URLSession(
             configuration: configuration,
             delegate: self,
@@ -304,7 +304,7 @@ open class EventSource: NSObject, URLSessionDataDelegate {
         }
     }
 
-    internal var lastEventID: String? {
+    var lastEventID: String? {
         set {
             if let lastEventID = newValue {
                 let defaults = UserDefaults.standard
