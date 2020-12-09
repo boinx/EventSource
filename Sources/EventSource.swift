@@ -43,7 +43,7 @@ open class EventSource: NSObject, URLSessionDataDelegate {
     
     // MARK: - Init
     
-    public init(url: String, headers: [String : String] = [:]) {
+    public init(url: String, headers: [String : String] = [:], immediatelyConnect: Bool) {
         // TODO: REFACTOR: Dont force unwrap even if it is safe.
         self.url = URL(string: url)!
         // TODO: REFACTOR: URL could be private.
@@ -62,6 +62,9 @@ open class EventSource: NSObject, URLSessionDataDelegate {
 		self.lastEventIDKey = "\(EventSource.DefaultsKey).\(self.uniqueIdentifier)"
         
         super.init()
+        if immediatelyConnect {
+            self.connect()
+        }
     }
 
     // MARK: - Connect
